@@ -439,7 +439,7 @@ def create_vm(kwargs, call=None):
         for disk in vm_info["disks"]:
             attach_disk(disk, vm_info["name"])
     if "networks" in vm_info:
-        for network in vm_info["disks"]:
+        for network in vm_info["networks"]:
             attach_network(network, vm_info["name"])
     # Check according to salt:
     if call != 'function':
@@ -447,16 +447,18 @@ def create_vm(kwargs, call=None):
             'The show_instance action must be called with -f or --function.'
         )
     connection.close()
-    return {'Created': '{0} was created.'.format(vmname)}
+    return {'Created': '{0} was created.'.format(vm_info["name"])}
 
 
 def attach_network(params, vm_name):
+
+    system_service = connection.system_service()
     vms_service = connection.system_service().vms_service()
     name_of_VM = 'name=' + str(vm_name)
     vm = vms_service.list(search=str(name_of_VM))[0]
 
-    assert "network" in params,        "Can't find disk name for in YML file"
-    assert "name" in params,        "Can't find disk name for in YML file"
+    assert "network" in params,        "Can't find network parameter in block networks in YML file"
+    assert "name" in params,        "Can't find network name for in YML file"
 
     cluster = system_service.clusters_service().cluster_service(vm.cluster.id).get()
     dcs_service = connection.system_service().data_centers_service()
