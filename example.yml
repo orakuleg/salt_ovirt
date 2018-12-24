@@ -1,0 +1,34 @@
+- name: VM_SALT_TESTING
+  os_type: Linux
+  common:
+    cluster: Cluster2
+    template: Blank
+    type: server
+    description: SALT DRIVER TEST
+    comment: SALT DRIVER TEST
+  CPU:
+    cores: 1
+    sockets: 1
+    threads: 1
+  memory:
+    memory: 1
+    guaranteed: 1
+    ballooning: True
+    maximum: 5
+  disks:
+  - name: BL394D
+    description: THIS IS TEST DISK FOR SALT DRIVER
+    provisioned_size: 2
+    storage_domains: SlowStorageDomain
+    interface: 'virtio'
+    format: 'cow'
+    active: True
+    bootable: True
+  - name: BL394D1
+    id: bla-bla-bla
+    exist_disk: True
+  networks:
+  - name: nic1
+    network: net112
+    interface: 'virtio'
+    description: TEST DRIVER SALT
