@@ -1,11 +1,16 @@
-- name: VM_SALT_TESTING
+- name: VM_SALT_TESTING_BISEROV
   os_type: Linux
   common:
-    cluster: Cluster2
+    cluster: C02
+    host: host1.cluster.example.com
     template: Blank
     type: server
+    boot_first_device: hd
+    boot_second_device: network
+    # valid choises: cdrom,hd,network
     description: SALT DRIVER TEST
     comment: SALT DRIVER TEST
+    soundcard_enabled: False
   CPU:
     cores: 1
     sockets: 1
@@ -19,16 +24,19 @@
   - name: BL394D
     description: THIS IS TEST DISK FOR SALT DRIVER
     provisioned_size: 2
-    storage_domains: SlowStorageDomain
     interface: 'virtio'
     format: 'cow'
+    storage_domains: ENC1-SS
     active: True
     bootable: True
-  - name: BL394D1
-    id: bla-bla-bla
-    exist_disk: True
+  # - name: BL394D1
+  #   id: bla-bla-bla
+  #   existing_disk: True
+  #   bootable: True
+  #   interface: 'virtio'
+  #   active: True
   networks:
   - name: nic1
-    network: net112
+    network: net184
     interface: 'virtio'
     description: TEST DRIVER SALT
