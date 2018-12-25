@@ -363,22 +363,57 @@ def parse_yaml(filename):
         raw_data = myfile.read()
     data = yaml.load(raw_data)
     data = data[0]
+    test_parse(data)
     return data
 
 
-def test_parse(kwargs, call=None):
+def test_parse(vm_info):
     '''
     testing purposes <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< FOR GOD SAKE PLEASE DONT FORGET TO DELETE SANYA
     '''
-    assert "filename" in kwargs, "Cant found filename parameter in function call"
+    req = "name,common,CPU,memory"
+    for i in req.split(","):
+        assert i in vm_info, 'Cant find parameter "{0}" in YML file'.format(i)
+    assert "memory" in vm_info["memory"], 'Cant find memory parameter in YML file'
+    assert "cluster" in vm_info["common"], 'Cant find cluster parameter in YML file'
 
-    vm_info = parse_yaml(kwargs["filename"])
-    print(vm_info)
-    return(vm_info)
-    if call != 'function':
-        raise SaltCloudSystemExit(
-            'The show_instance action must be called with -f or --function.'
-        )
+    if "networks" in vm_info:
+        for network in vm_info["networks"]:
+            assert "network" in network,                "Can't find network parameter in block networks for '{0}' in YML file".format(
+                network["name"])
+            assert "name" in network,                   "Can't find network name in block networks for '{0}' in YML file".format(
+                network["name"])
+            assert "interface" in network,              "Can't find interface name in block networks for '{0}' in YML file".format(
+                network["name"])
+
+    if "disks" in vm_info:
+        for disk in vm_info["disks"]:
+            assert "name" in disk,                      "Can't find disk name for in YML file for disk '{0}' in YML file".format(
+                disk["name"])
+            assert "interface" in disk,                 "Can't find disk interface in YML file for disk '{0}' in YML file".format(
+                disk["name"])
+            assert "active" in disk,                    "Can't find disk active in YML file for disk '{0}' in YML file".format(
+                disk["name"])
+            assert "bootable" in disk,                  "Can't find disk bootable parameter in YML file for disk '{0}' in YML file".format(
+                disk["name"])
+            if "existing_disk" not in disk:
+                assert "format" in disk,                "Can't find disk format in YML file for disk '{0}' in YML file".format(
+                    disk["name"])
+                assert "provisioned_size" in disk,      "Can't find disk provisioned_size parameter in YML file for disk '{0}' in YML file".format(
+                    disk["name"])
+                assert "storage_domains" in disk,       "Can't find disk storage_domains parameter in YML file for disk '{0}' in YML file".format(
+                    disk["name"])
+            else:
+                if disk["existing_disk"] == True:
+                    assert "id" in disk,                "Can't find disk id parameter in YML file for disk '{0}' in YML file".format(
+                        disk["name"])
+                else:
+                    assert "format" in disk,            "Can't find disk format in YML file for disk '{0}' in YML file".format(
+                        disk["name"])
+                    assert "provisioned_size" in disk,  "Can't find disk provisioned_size parameter in YML file for disk '{0}' in YML file".format(
+                        disk["name"])
+                    assert "storage_domains" in disk,   "Can't find disk storage_domains parameter in YML file for disk '{0}' in YML file".format(
+                        disk["name"])
 
 
 def create_vm(kwargs, call=None):
@@ -391,11 +426,27 @@ def create_vm(kwargs, call=None):
 
     vm_info = parse_yaml(kwargs["filename"])
 
-    req = "name,common,CPU,memory"
-    for i in req.split(","):
-        assert i in vm_info, 'Cant find parameter "{0}" in YML file'.format(i)
-    assert "memory" in vm_info["memory"], 'Cant find memory parameter in YML file'
-    assert "cluster" in vm_info["common"], 'Cant find cluster parameter in YML file'
+    boot_devices=[]
+    if "boot_first_device" in vm_info["common"]:
+        if vm_info["common"]["boot_first_device"].lower() in ["hd","network","cdrom"]:
+            if vm_info["common"]["boot_first_device"].lower() == "hd":
+                boot_devices.append(types.BootDevice.HD)
+            elif vm_info["common"]["boot_first_device"].lower() == "cdrom":
+                boot_devices.append(types.BootDevice.CDROM)
+            elif vm_info["common"]["boot_first_device"].lower() == "network":
+                boot_devices.append(types.BootDevice.NETWORK)
+        else:
+            boot_devices.append(None)
+    if "boot_second_device" in vm_info["common"]:
+        if vm_info["common"]["boot_second_device"].lower() in ["hd","network","cdrom"]:
+            if vm_info["common"]["boot_second_device"].lower() == "hd":
+                boot_devices.append(types.BootDevice.HD)
+            elif vm_info["common"]["boot_second_device"].lower() == "cdrom":
+                boot_devices.append(types.BootDevice.CDROM)
+            elif vm_info["common"]["boot_second_device"].lower() == "network":
+                boot_devices.append(types.BootDevice.NETWORK)
+        else:
+            boot_devices.append(None)
 
     connection()
     vms_service = connection.system_service().vms_service()
@@ -404,13 +455,12 @@ def create_vm(kwargs, call=None):
             name=vm_info["name"],
             os=types.OperatingSystem(
                 type=vm_info["os_type"] if "os_type" in vm_info else "Other",
+                boot=types.Boot(devices=boot_devices)
             ),
-            # ''' tyt vot nuxyya ne rabotaet TODO'''
-            # # placement_policy=types.VmPlacementPolicy(
-            # #     affinity=types.VmAffinity(
-            # #         self.param('placement_policy')
-            # #     ),
-            # #     hosts=[types.Host(name=self.param('host')), ]
+            # type=vm_info["common"]["type"],
+            placement_policy=types.VmPlacementPolicy(
+                hosts=[types.Host(name=vm_info["common"]["host"])]
+            ),
             cpu=types.Cpu(
                 topology=types.CpuTopology(
                     cores=vm_info["CPU"]["cores"] if "cores" in vm_info["CPU"] else 1,
@@ -420,9 +470,13 @@ def create_vm(kwargs, call=None):
             ),
             memory=1024 * 1024 * 1024 * int(vm_info["memory"]["memory"]),
             memory_policy=types.MemoryPolicy(
-                guaranteed=1024 * 1024 * 1024 * vm_info["memory"]["guaranteed"] if "guaranteed" in vm_info["memory"] else 512 * 1024 * 1024 * int(vm_info["memory"]["memory"]),
+                guaranteed=1024 * 1024 * 1024 *
+                vm_info["memory"]["guaranteed"] if "guaranteed" in vm_info["memory"] else 512 *
+                1024 * 1024 * int(vm_info["memory"]["memory"]),
                 ballooning=vm_info["memory"]["ballooning"] if "ballooning" in vm_info["memory"] else True,
-                max=1024 * 1024 * 1024 * vm_info["memory"]["maximum"] if "maximum" in vm_info["memory"] else 2048 * 1024 * 1024 * int(vm_info["memory"]["memory"]),
+                max=1024 * 1024 * 1024 *
+                vm_info["memory"]["maximum"] if "maximum" in vm_info["memory"] else 2048 *
+                1024 * 1024 * int(vm_info["memory"]["memory"]),
             ),
             cluster=types.Cluster(
                 name=vm_info["common"]["cluster"],
@@ -432,6 +486,7 @@ def create_vm(kwargs, call=None):
             ),
             description=vm_info["common"]["description"] if "description" in vm_info["common"] else "Not provided",
             comment=vm_info["common"]["comment"] if "comment" in vm_info["common"] else "Not provided",
+            soundcard_enabled=vm_info["common"]["soundcard_enabled"] if "soundcard_enabled" in vm_info["common"] else False,
         ),
     )
 
@@ -457,9 +512,6 @@ def attach_network(params, vm_name):
     name_of_VM = 'name=' + str(vm_name)
     vm = vms_service.list(search=str(name_of_VM))[0]
 
-    assert "network" in params,        "Can't find network parameter in block networks in YML file"
-    assert "name" in params,        "Can't find network name for in YML file"
-
     cluster = system_service.clusters_service().cluster_service(vm.cluster.id).get()
     dcs_service = connection.system_service().data_centers_service()
     dc = dcs_service.list(search='Clusters.name=%s' % cluster.name)[0]
@@ -468,7 +520,7 @@ def attach_network(params, vm_name):
         (n for n in networks_service.list()
             if n.name == params["network"]),
         None
-        )
+    )
     profiles_service = connection.system_service().vnic_profiles_service()
     profile_id = None
     for profile in profiles_service.list():
@@ -485,24 +537,18 @@ def attach_network(params, vm_name):
             name=params["name"],
             description=params["description"] if "description" in params else "Not provided",
             vnic_profile=types.VnicProfile(id=profile_id,
-            ),
+                                           ),
         ),
     )
 
-    # Check according to salt:
 
 def attach_disk(params, vm_name):
 
     vms_service = connection.system_service().vms_service()
     name_of_VM = 'name=' + str(vm_name)
     vm = vms_service.list(search=str(name_of_VM))[0]
-    disk_attachments_service = vms_service.vm_service(vm.id).disk_attachments_service()
-
-    assert "name" in params,        "Can't find disk name for in YML file"
-    assert "format" in params,      "Can't find disk format in YML file"
-    assert "interface" in params,   "Can't find disk interface in YML file"
-    assert "active" in params,      "Can't find disk active in YML file"
-    assert "bootable" in params,    "Can't find disk bootable parameter in YML file"
+    disk_attachments_service = vms_service.vm_service(
+        vm.id).disk_attachments_service()
 
     if params["format"].lower() == "raw":
         disk_format = types.DiskFormat.RAW
@@ -515,24 +561,59 @@ def attach_disk(params, vm_name):
     if params["interface"].lower() == "virtio":
         disk_interface = types.DiskInterface.VIRTIO
     else:
-        return("Cant determinate format of disk. Supported only RAW and COW")
+        return("Cant interface of disk. Supported only RAW and COW")
         raise SaltCloudExecutionFailure
 
-    disk_attachment = disk_attachments_service.add(
-        types.DiskAttachment(
-            disk=types.Disk(
-                name=params["name"],
-                description=params["description"] if "description" in params else "Not provided",
-                format=disk_format,
-                provisioned_size=int(params["provisioned_size"]) * 2**30,
-                storage_domains=[
-                    types.StorageDomain(
-                        name=params["storage_domains"],
-                    ),
-                ],
+    if "existing_disk" not in params:
+        disk_attachment = disk_attachments_service.add(
+            types.DiskAttachment(
+                disk=types.Disk(
+                    name=params["name"],
+                    description=params["description"] if "description" in params else "Not provided",
+                    format=disk_format,
+                    provisioned_size=int(params["provisioned_size"]) * 2**30,
+                    storage_domains=[
+                        types.StorageDomain(
+                            name=params["storage_domains"],
+                        ),
+                    ],
+                ),
+                interface=disk_interface,
+                bootable=params["bootable"],
+                active=params["active"],
             ),
-            interface=disk_interface,
-            bootable=params["bootable"],
-            active=params["active"],
-        ),
-    )
+        )
+    else:
+        if params["existing_disk"] == True:
+            disk_attachments_service.add(
+                types.DiskAttachment(
+                    disk=types.Disk(
+                        id=params["id"],
+                    ),
+                    active=params["active"],
+                    interface=types.DiskInterface(
+                        disk_interface
+                    ),
+                    bootable=params["bootable"],
+                )
+            )
+        else:
+            disk_attachment = disk_attachments_service.add(
+                types.DiskAttachment(
+                    disk=types.Disk(
+                        name=params["name"],
+                        description=params["description"] if "description" in params else "Not provided",
+                        format=disk_format,
+                        provisioned_size=int(
+                            params["provisioned_size"]) * 2**30,
+                        storage_domains=[
+                            types.StorageDomain(
+                                name=params["storage_domains"],
+                            ),
+                        ],
+                    ),
+                    interface=disk_interface,
+                    bootable=params["bootable"],
+                    active=params["active"],
+                ),
+            )
