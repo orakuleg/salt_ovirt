@@ -26,6 +26,7 @@
     provisioned_size: 2
     interface: 'virtio'
     format: 'cow'
+    # valid choises: cow (thin provision) or raw (preallocated)
     storage_domains: ENC1-SS
     active: True
     bootable: True
